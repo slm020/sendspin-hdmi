@@ -1,113 +1,114 @@
 # sendspin-hdmi
 
-Turn a small Linux box (or a Proxmox LXC) with an HDMI port into a **Music Assistant speaker with a now-playing screen**.
+Turn a small Linux box, or a Proxmox container, into a Music Assistant speaker with a now-playing screen on your TV.
 
-- Plays audio as a Sendspin player, so it stays in sync with your other Music Assistant speakers and can join their groups.
-- Sends the sound over **HDMI**, e.g. to an AV receiver or TV.
-- Shows a full-screen **now-playing page** on the same HDMI output: cover art, title, artist, album, time-synced lyrics, and Music Assistant's real waveform as the progress bar.
-- Has a **settings page** for your phone or laptop: Music Assistant connection, audio output with a test tone, screen options, group membership, and amp control (Denon/Marantz, webhook or shell command when playback starts and stops).
+*Unofficial community project. Not made by or linked to the Open Home Foundation, Music Assistant or Sendspin.*
 
-> Unofficial community project. It is not made by or affiliated with the Open Home Foundation, Music Assistant or Sendspin.
+## What it does
 
-## How it works
+- Plays music from Music Assistant as a Sendspin player, in sync with your other speakers.
+- Sends the sound out over HDMI to your TV or AV receiver.
+- Shows a full-screen now-playing page on the same HDMI output:
+  - cover art, title, artist and album
+  - lyrics that scroll in time with the song
+  - Music Assistant's real waveform as the progress bar
+  - a clock when nothing is playing
+- Has a settings page you can open on your phone or laptop.
+- Can switch your amp on and off when music starts and stops (optional).
 
-```
-Music Assistant ──Sendspin (audio)──▶ sendspin client ──HDMI audio──▶ AV receiver / TV
-       │                                                                    ▲
-       └──websocket API (track, cover, lyrics, waveform)──▶ web app ──▶ Chromium kiosk ──HDMI video
-```
+Everything on the screen comes from Music Assistant, so it matches what Music Assistant shows. Nothing is made up: until Music Assistant has analysed a song, the progress bar is a plain bar.
 
-| Service | What it does |
-|---|---|
-| `sendspin-hdmi-player` | The [sendspin](https://pypi.org/project/sendspin/) client playing to the HDMI audio device |
-| `sendspin-hdmi-web` | Now-playing page and settings page (port 8080), Music Assistant client |
-| `sendspin-hdmi-kiosk` | sway + Chromium full screen on the HDMI output |
-| `sendspin-hdmi-bus` | Private D-Bus for the player's metadata (fallback when Music Assistant isn't the source) |
+## What you need
 
-Everything shown on the screen comes from Music Assistant, so it matches what Music Assistant shows: the same cover, the same lyrics (from MA's lyrics providers) and the same waveform analysis. Before MA has analysed a track the progress bar is a plain bar. Nothing on the screen is made up.
+- Music Assistant with Sendspin (tested with version 2.11 beta).
+- A Music Assistant **long-lived token**:
+  - open Music Assistant
+  - go to your user profile
+  - create a long-lived token in its tokens section and copy it
+- A computer with an HDMI port plugged into your TV or AV receiver. An Intel mini PC running Proxmox is ideal.
+- Tested on Debian 13 in a Proxmox container. Other Debian set-ups should work but haven't been tested.
 
-## Requirements
+## Install on Proxmox (easiest)
 
-- Music Assistant with Sendspin support (tested with 2.11 beta) and its Sendspin player provider enabled.
-- A Music Assistant **long-lived token**: in Music Assistant open your user profile and create one in its tokens section.
-- A machine with an HDMI output that Linux can drive: an Intel/AMD mini PC is ideal. Debian (tested on Debian 13 in a Proxmox LXC; Debian 12, VMs and bare metal should work but are untested).
+- Log in to your Proxmox host as root (the machine whose HDMI port goes to your TV or amp).
+- Download the script:
 
-## Install on Proxmox (recommended)
+  ```bash
+  curl -fsSL https://raw.githubusercontent.com/slm020/sendspin-hdmi/main/proxmox/create-lxc.sh -o create-lxc.sh
+  ```
 
-This creates an unprivileged Debian container that uses the Proxmox host's own HDMI port for sound and picture. Run on the **Proxmox host** as root:
+- Run it, using your own Music Assistant address and a name for the player:
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/slm020/sendspin-hdmi/main/proxmox/create-lxc.sh -o create-lxc.sh
-bash create-lxc.sh -- --ma-url http://YOUR_MA_HOST:8095 --name "Living Room TV"
-```
+  ```bash
+  bash create-lxc.sh -- --ma-url http://192.168.1.10:8095 --name "Living Room TV"
+  ```
 
-It asks for the token and a settings password (or generates one), then prints the settings page address. Options: `--ctid`, `--hostname`, `--storage`, `--bridge`, `--ip 192.168.1.60/24 --gw 192.168.1.1`, `--memory`, `--cores`, `--disk`, `--yes`. Run with `--help` for the full list.
+- Paste your token when asked.
+- Pick a settings password, or press Enter to have one made for you.
+- At the end it shows the settings page address. Open it and press **Play test tone**.
 
-What the script changes on the host, and what that means:
+Good to know:
 
-- It adds `/etc/udev/rules.d/90-sendspin-hdmi.rules`, which makes the host's sound (`/dev/snd`) and GPU (`/dev/dri`) devices mode `0666`. An unprivileged container needs this to use them. It also means any local user, and any other container you give these devices to, can use the host's sound cards and GPU. The script asks before writing it.
-- The container drives the host's HDMI output directly, so the Proxmox text console on that screen is replaced by the now-playing screen while the container runs.
-- Only one container can use the HDMI output at a time.
+- It makes a new container and installs everything inside it.
+- It lets the container use the host's sound and graphics. To do that it makes the host's sound and graphics devices usable by everyone on the host. It asks before doing this.
+- While the container is running, the screen shows the now-playing page instead of the Proxmox console.
+- Only one container can use the HDMI port at a time.
+- Extra options: `--ctid`, `--hostname`, `--storage`, `--bridge`, `--ip 192.168.1.60/24 --gw 192.168.1.1`, `--memory`, `--cores`, `--disk`, `--yes`. Run with `--help` to see them all.
 
-## Install on any Debian machine
+## Install on any other Debian machine
 
-Run as root on the machine (or inside a container or VM that already has `/dev/snd` and `/dev/dri`):
+- Log in as root on the machine (it needs `/dev/snd` for sound and `/dev/dri` for the screen).
+- Run:
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/slm020/sendspin-hdmi/main/install.sh -o install.sh
-bash install.sh --ma-url http://YOUR_MA_HOST:8095 --name "Living Room TV"
-```
+  ```bash
+  curl -fsSL https://raw.githubusercontent.com/slm020/sendspin-hdmi/main/install.sh -o install.sh
+  bash install.sh --ma-url http://192.168.1.10:8095 --name "Living Room TV"
+  ```
 
-Use `--no-screen` for a headless audio-only player. Running the installer again upgrades the app and keeps your settings.
+- Add `--no-screen` if you only want sound.
+- To update later, just run the installer again. Your settings are kept.
 
 ## Settings page
 
-Open `http://<player-ip>:8080/settings` and log in with the password you set (any user name).
+- Open `http://<player-address>:8080/settings`.
+- Log in with your password. Any user name works.
+- **Status**: whether it's connected, plus buttons to restart the player or screen.
+- **Music Assistant**: address, token and a **Test connection** button.
+- **Player & audio**: player name, HDMI output (*Automatic* picks whatever is plugged in), **Play test tone**, sync delay.
+- **Screen**: turn the screen on or off, resolution, title, lyrics, waveform, clock, what to show when idle, lyric timing and accent colour.
+- **Groups**: tick the Music Assistant groups this player should be part of.
+- **Amp control**: what to do when music starts and stops:
+  - Denon or Marantz receiver: switch it on, pick the input and sound mode, standby when stopped
+  - Webhook, e.g. a Home Assistant automation
+  - Shell command
+- **Security**: change the password or the web port.
 
-| Section | What you can set |
-|---|---|
-| Status | Connection state, the player's Music Assistant ID, service status, restart buttons |
-| Music Assistant | Address, token (write-only: it is never shown again), connection test, optional Sendspin server URL |
-| Player & audio | Player name, HDMI output (automatic picks the connected TV or receiver), rescan, **test tone**, sync delay, audio format |
-| Screen | On/off, resolution, title, lyrics, waveform, clock (12/24 h), idle screen (logo + clock, logo, black), lyric timing offset, accent colour |
-| Groups | Tick the Music Assistant sync groups this player is a saved member of |
-| Amp control | On start / on stop: Denon/Marantz (power, input, sound mode over telnet), webhook (e.g. a Home Assistant webhook automation) or shell command; delay before the stop action |
-| Security | Settings password, web port |
+The now-playing page itself is at `http://<player-address>:8080/` and works in any browser, no password needed.
 
-The now-playing page itself (`http://<player-ip>:8080/`) needs no password and works in any browser.
+## Good to know
 
-### Groups
+- **Groups:** like any Music Assistant player, it joins its saved groups when the group starts playing. If the player restarts in the middle of a song, it rejoins the next time the group starts.
+- **Amp control:** the stop action waits 60 seconds (you can change this), so pauses and track changes don't switch your amp off. Music Assistant announcements count as music too.
 
-Saved members of a Music Assistant sync group join it whenever the group starts playing. If the player restarts partway through a song (update, reboot, settings change), it drops out of the group and is added back the next time the group starts, the same as any other Music Assistant player.
+## If something isn't working
 
-### Amp control
+- **No sound:**
+  - check your amp is on the right input and the volume is up
+  - press **Play test tone** on the settings page
+- **The HDMI output isn't listed:** press **Rescan** (the sound stops for a moment). Outputs only show your TV's or amp's name once it's switched on.
+- **No picture, or picture but no sound, at 4K:** use 1920x1080. Some Intel mini PCs lose the picture and the sound at 4K.
+- **Blank screen after the TV or amp was off:**
+  - on the host, run `echo detect > /sys/class/drm/card0-HDMI-A-1/status` (find your connector with `ls /sys/class/drm`)
+  - then press **Restart screen**
+- **The player doesn't show up in Music Assistant:** port 8927 on the Music Assistant machine must be reachable from the player.
+- **Lyrics early or late:** change **Lyric timing**. If the sound itself is out of sync with your other speakers, change **Sync delay**.
+- **Logs:** `journalctl -u sendspin-hdmi-player -u sendspin-hdmi-web -u sendspin-hdmi-kiosk -f`
 
-The start action runs when audio starts. The stop action runs after the configured delay (60 s by default), and is cancelled if playback resumes in the meantime, so pauses and track changes don't switch your amp off. Music Assistant announcements also count as playback.
+## Where things are kept
 
-Shell commands run as root and receive the `SENDSPIN_*` environment variables from the player.
-
-## Troubleshooting
-
-| Problem | Try |
-|---|---|
-| No sound, but Music Assistant says it's playing | Check the receiver is on the right input and its volume. Press *Play test tone*. On a fresh Sendspin client the software volume would start at 25 %; sendspin-hdmi sets it to 100 % on first start. |
-| Wrong or missing HDMI output in the list | The player holds the device it is using. Press *Rescan* (stops audio briefly). HDMI outputs are only named after the connected device once the TV or receiver is on. |
-| No picture, or picture but no sound at 4K | Use 1920x1080. On some Intel mini PCs, 4K modes gave no picture and also cut HDMI audio. |
-| Screen stays black after the TV or receiver was off | On the host: `echo detect > /sys/class/drm/card0-HDMI-A-1/status` (use your connector name from `ls /sys/class/drm`), then restart the screen. |
-| Player not found in Music Assistant | The status box shows the Sendspin server URL. It must be reachable (port 8927 on the MA host). Check the player service log: `journalctl -u sendspin-hdmi-player`. |
-| Lyrics early or late | Adjust *Lyric timing*, or the *Sync delay* if the audio itself is out of sync with your other speakers. |
-
-Logs: `journalctl -u sendspin-hdmi-player -u sendspin-hdmi-web -u sendspin-hdmi-kiosk -f`
-
-## Files
-
-| Path | What |
-|---|---|
-| `/etc/sendspin-hdmi/config.json` | All settings (mode 600; contains the MA token) |
-| `/opt/sendspin-hdmi/` | App and Python environment |
-| `/var/lib/sendspin-hdmi/sendspin/` | Sendspin identity (keep it to keep the same player in Music Assistant) |
-
-To move an existing player to a new machine without Music Assistant seeing a new player, copy `/var/lib/sendspin-hdmi/sendspin/identity-daemon.json` across before starting it.
+- Settings: `/etc/sendspin-hdmi/config.json` (contains your token, readable by root only).
+- App: `/opt/sendspin-hdmi/`
+- Player identity: `/var/lib/sendspin-hdmi/sendspin/`. Copy `identity-daemon.json` to a new machine to keep the same player in Music Assistant.
 
 ## Uninstall
 
@@ -117,7 +118,16 @@ rm /etc/systemd/system/sendspin-hdmi-*.service
 rm -r /opt/sendspin-hdmi /etc/sendspin-hdmi /var/lib/sendspin-hdmi
 ```
 
-On a Proxmox host, also remove `/etc/udev/rules.d/90-sendspin-hdmi.rules` if no other container needs it.
+- On Proxmox, also delete `/etc/udev/rules.d/90-sendspin-hdmi.rules` on the host if nothing else needs it.
+
+## How it fits together
+
+| Service | Job |
+|---|---|
+| `sendspin-hdmi-player` | Plays the music to the HDMI sound output |
+| `sendspin-hdmi-web` | Now-playing page, settings page and the Music Assistant connection |
+| `sendspin-hdmi-kiosk` | Shows the now-playing page full screen on HDMI |
+| `sendspin-hdmi-bus` | Passes song details from the player to the web service as a backup |
 
 ## Licence
 
