@@ -97,6 +97,7 @@ The now-playing page itself is at `http://<player-address>:8080/` and works in a
   - press **Play test tone** on the settings page
 - **The HDMI output isn't listed:** press **Rescan** (the sound stops for a moment). Outputs only show your TV's or amp's name once it's switched on.
 - **No picture, or picture but no sound, at 4K:** use 1920x1080. Some Intel mini PCs lose the picture and the sound at 4K.
+- **Screen frozen:** it checks itself every 20 seconds and restarts the screen if it has frozen, so it should fix itself within a minute. If it keeps happening, look for `screen watchdog` in the logs.
 - **Blank screen after the TV or amp was off:**
   - on the host, run `echo detect > /sys/class/drm/card0-HDMI-A-1/status` (find your connector with `ls /sys/class/drm`)
   - then press **Restart screen**

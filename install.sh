@@ -57,7 +57,7 @@ fi
 say "Installing packages"
 export DEBIAN_FRONTEND=noninteractive
 PKGS="python3 python3-venv libportaudio2 alsa-utils dbus ca-certificates"
-[ "$SCREEN" = 1 ] && PKGS="$PKGS sway chromium fonts-noto-core fonts-noto-color-emoji"
+[ "$SCREEN" = 1 ] && PKGS="$PKGS sway grim chromium fonts-noto-core fonts-noto-color-emoji"
 apt-get update -qq
 # shellcheck disable=SC2086
 apt-get install -y -qq --no-install-recommends $PKGS >/dev/null

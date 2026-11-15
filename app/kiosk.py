@@ -3,6 +3,8 @@
 import os
 import shlex
 import shutil
+import signal
+import subprocess
 import sys
 import time
 import urllib.request
@@ -60,10 +62,61 @@ focus_follows_mouse no
 seat * hide_cursor 1
 exec {browser}
 """)
-    env = dict(os.environ, XDG_RUNTIME_DIR=os.path.join(RUN, "xdg"), LIBSEAT_BACKEND="noop",
+    xdg = os.path.join(RUN, "xdg")
+    for name in os.listdir(xdg):  # leftovers from a killed sway
+        if name.startswith(("wayland-", "sway-ipc.")):
+            try:
+                os.unlink(os.path.join(xdg, name))
+            except OSError:
+                pass
+    env = dict(os.environ, XDG_RUNTIME_DIR=xdg, LIBSEAT_BACKEND="noop",
                WLR_BACKENDS="drm", WLR_RENDERER=os.environ.get("WLR_RENDERER", "gles2"), HOME="/root")
+    # Atomic KMS commits on Intel HDMI can fail with EBUSY when the receiver/projector
+    # renegotiates; wlroots then never schedules another frame and the picture freezes.
+    # The legacy KMS path doesn't hit this. Set WLR_DRM_NO_ATOMIC=0 in the unit to undo.
+    env.setdefault("WLR_DRM_NO_ATOMIC", "1")
     sway = shutil.which("sway") or "/usr/bin/sway"
-    os.execve(sway, [sway, "--unsupported-gpu", "-c", sway_conf], env)
+    proc = subprocess.Popen([sway, "--unsupported-gpu", "-c", sway_conf], env=env)
+
+    def stop(*_):
+        proc.terminate()
+        sys.exit(0)
+    signal.signal(signal.SIGTERM, stop)
+    return watchdog(proc, xdg)
+
+
+def watchdog(proc, xdg):
+    """Restart the screen if sway stops producing frames.
+
+    Every 20 s ask sway for a tiny screenshot. A healthy sway answers within a frame;
+    a frozen one (stuck output) never does. Two misses in a row -> stop sway and exit
+    non-zero so systemd starts the kiosk again.
+    """
+    grim = shutil.which("grim")
+    misses = 0
+    time.sleep(30)  # let sway and the browser start
+    while proc.poll() is None:
+        sock = next((n for n in sorted(os.listdir(xdg))
+                     if n.startswith("wayland-") and not n.endswith(".lock")), None)
+        if grim and sock:
+            env = dict(os.environ, XDG_RUNTIME_DIR=xdg, WAYLAND_DISPLAY=sock)
+            try:
+                subprocess.run([grim, "-s", "0.05", "-t", "ppm", "-"], env=env, timeout=10,
+                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+                misses = 0
+            except (subprocess.TimeoutExpired, subprocess.CalledProcessError):
+                misses += 1
+                print(f"screen watchdog: sway did not deliver a frame ({misses})", flush=True)
+                if misses >= 2:
+                    print("screen watchdog: screen frozen, restarting it", flush=True)
+                    proc.terminate()
+                    try:
+                        proc.wait(10)
+                    except subprocess.TimeoutExpired:
+                        proc.kill()
+                    return 1
+        time.sleep(20)
+    return proc.returncode or 1
 
 
 if __name__ == "__main__":

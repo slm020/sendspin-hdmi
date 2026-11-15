@@ -5,7 +5,7 @@ Wants=sendspin-hdmi-web.service
 
 [Service]
 ExecStart=/opt/sendspin-hdmi/venv/bin/python /opt/sendspin-hdmi/app/kiosk.py
-Restart=on-failure
+Restart=always
 RestartSec=5
 
 [Install]
