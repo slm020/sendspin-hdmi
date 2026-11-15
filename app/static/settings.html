@@ -126,13 +126,9 @@
 
   <section>
     <h2>Groups</h2>
-    <div class="hint">Saved members of a Music Assistant sync group play whenever that group starts. If this player restarts partway through a song, Music Assistant leaves it out until the group starts again. Auto-rejoin puts it back.</div>
+    <div class="hint">Saved members of a Music Assistant sync group join it whenever that group starts playing.</div>
     <div class="groups" id="groups"><div class="hint">Loading groups</div></div>
     <div class="msg" id="groupMsg"></div>
-    <div class="check"><input type="checkbox" id="groups_auto_rejoin"><label for="groups_auto_rejoin" style="margin:0">Rejoin a playing group after this player restarts</label></div>
-    <label for="groups_rejoin_window_s">Only within this many seconds of reconnecting</label>
-    <input type="number" id="groups_rejoin_window_s" min="10" step="10">
-    <div class="hint">So that taking the player out of a group by hand later on is respected.</div>
   </section>
 
   <section>
@@ -199,7 +195,6 @@ const FIELDS = [
   ["screen", "enabled", "bool"], ["screen", "resolution"], ["screen", "brand"], ["screen", "show_lyrics", "bool"],
   ["screen", "show_waveform", "bool"], ["screen", "show_clock", "bool"], ["screen", "clock_24h", "bool"],
   ["screen", "idle"], ["screen", "lyric_offset_ms", "int"], ["screen", "accent"],
-  ["groups", "auto_rejoin", "bool"], ["groups", "rejoin_window_s", "int"],
   ["hooks", "stop_delay_s", "int"], ["web", "port", "int"],
 ];
 const HOOK_KEYS = ["type", "denon_host", "denon_input", "denon_mode", "denon_power", "method", "url", "body"];

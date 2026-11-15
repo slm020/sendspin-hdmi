@@ -20,7 +20,7 @@ Music Assistant ──Sendspin (audio)──▶ sendspin client ──HDMI audio
 | Service | What it does |
 |---|---|
 | `sendspin-hdmi-player` | The [sendspin](https://pypi.org/project/sendspin/) client playing to the HDMI audio device |
-| `sendspin-hdmi-web` | Now-playing page and settings page (port 8080), Music Assistant client, auto-rejoin of groups |
+| `sendspin-hdmi-web` | Now-playing page and settings page (port 8080), Music Assistant client |
 | `sendspin-hdmi-kiosk` | sway + Chromium full screen on the HDMI output |
 | `sendspin-hdmi-bus` | Private D-Bus for the player's metadata (fallback when Music Assistant isn't the source) |
 
@@ -70,15 +70,15 @@ Open `http://<player-ip>:8080/settings` and log in with the password you set (an
 | Music Assistant | Address, token (write-only: it is never shown again), connection test, optional Sendspin server URL |
 | Player & audio | Player name, HDMI output (automatic picks the connected TV or receiver), rescan, **test tone**, sync delay, audio format |
 | Screen | On/off, resolution, title, lyrics, waveform, clock (12/24 h), idle screen (logo + clock, logo, black), lyric timing offset, accent colour |
-| Groups | Tick the Music Assistant sync groups this player is a saved member of; auto-rejoin after a restart |
+| Groups | Tick the Music Assistant sync groups this player is a saved member of |
 | Amp control | On start / on stop: Denon/Marantz (power, input, sound mode over telnet), webhook (e.g. a Home Assistant webhook automation) or shell command; delay before the stop action |
 | Security | Settings password, web port |
 
 The now-playing page itself (`http://<player-ip>:8080/`) needs no password and works in any browser.
 
-### Groups and auto-rejoin
+### Groups
 
-Music Assistant adds a sync group's saved members when the group *starts* playing. If the player restarts partway through a song (update, reboot, settings change), Music Assistant leaves it out until the group starts again. sendspin-hdmi puts it back by itself: for a short window after the player reconnects (120 s by default), it rejoins a playing group that has it as a saved member. If you take the player out of a group later on, it stays out.
+Saved members of a Music Assistant sync group join it whenever the group starts playing. If the player restarts partway through a song (update, reboot, settings change), it drops out of the group and is added back the next time the group starts, the same as any other Music Assistant player.
 
 ### Amp control
 

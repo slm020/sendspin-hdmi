@@ -39,10 +39,6 @@ DEFAULTS = {
         "lyric_offset_ms": 0, # + shows lyrics later, - earlier
         "accent": "#5ac8fa",
     },
-    "groups": {
-        "auto_rejoin": True,
-        "rejoin_window_s": 120,
-    },
     "hooks": {
         "stop_delay_s": 60,
         "start": {"type": "none", "command": "", "url": "", "method": "POST", "body": "",

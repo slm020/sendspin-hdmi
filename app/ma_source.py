@@ -3,7 +3,7 @@
 Talks to MA's websocket API with a long-lived token and keeps, for this player's active
 queue item: title / artist / album / cover / position, MA's own lyrics
 (metadata.lrc_lyrics / metadata.lyrics) and MA's real waveform (audio_analysis/wave_form,
-1800 RMS bins). Also puts the player back into a playing sync group after it reconnects.
+1800 RMS bins).
 """
 import asyncio
 import time
@@ -14,24 +14,10 @@ import aiohttp
 state = {
     "ok": False, "seen": 0.0, "now": None, "error": "",
     "player_id": "", "player_name": "", "server_version": "",
-    "available": None, "rejoin_until": 0.0,
 }
 tracks: dict[str, dict] = {}  # queue_item_id -> {"lyrics": {...}|None, "wave": [...]|None}
 
 _client = None  # the running MAClient
-
-
-def _pstate(p):
-    st = p.get("playback_state") or p.get("state")
-    return st.get("playback_state") if isinstance(st, dict) else st
-
-
-def open_rejoin_window(reason, seconds=None):
-    if _client is None:
-        return
-    secs = seconds if seconds is not None else _client.cfg["groups"]["rejoin_window_s"]
-    state["rejoin_until"] = time.time() + secs
-    print(f"rejoin window open for {secs}s ({reason})", flush=True)
 
 
 def find_player(players, client_id, name):
@@ -192,35 +178,6 @@ class MAClient:
         cfg = await self.call("config/players/get", player_id=group_id) or {}
         return ((cfg.get("values") or {}).get("group_members") or {}).get("value") or []
 
-    async def rejoin_check(self):
-        """Put this player back into a playing sync group that has it as a saved member.
-
-        MA only applies a group's saved members when the group starts playing, so a member
-        that reconnects mid-song stays out. Only acts inside the rejoin window (opened on
-        startup / reconnect), so a deliberate removal later is respected.
-        """
-        players, me = await self.locate_player()
-        if not me:
-            return
-        was = state["available"]
-        state["available"] = bool(me.get("available"))
-        if state["available"] and was is False:
-            open_rejoin_window("player became available")
-        if not self.cfg["groups"]["auto_rejoin"] or time.time() > state["rejoin_until"] or not state["available"]:
-            return
-        if me.get("active_group") or me.get("synced_to") or _pstate(me) == "playing":
-            state["rejoin_until"] = 0
-            return
-        for g in players:
-            if g.get("type") != "group" or _pstate(g) != "playing":
-                continue
-            if me["player_id"] in await self.saved_members(g["player_id"]):
-                await self.call("players/cmd/set_members", target_player=g["player_id"],
-                                player_ids_to_add=[me["player_id"]])
-                print(f"rejoined group {g.get('name')} ({g['player_id']})", flush=True)
-                state["rejoin_until"] = 0
-                return
-
     async def groups(self):
         """Sync groups and whether this player is a saved member (settings page)."""
         players, me = await self.locate_player()
@@ -247,8 +204,6 @@ class MAClient:
         await self.call("config/players/save", player_id=group_id, values={"group_members": members})
 
     async def run(self):
-        last_rejoin = 0.0
-        state["rejoin_until"] = time.time() + self.cfg["groups"]["rejoin_window_s"]
         while True:
             self.reconnect.clear()
             try:
@@ -262,12 +217,6 @@ class MAClient:
                         if state["player_id"]:
                             state["error"] = ""
                     await self.poll_once()
-                    if time.time() - last_rejoin > 5:
-                        last_rejoin = time.time()
-                        try:
-                            await self.rejoin_check()
-                        except Exception as exc:
-                            print("rejoin error:", repr(exc), flush=True)
                     try:
                         await asyncio.wait_for(self.reconnect.wait(), 1)
                     except asyncio.TimeoutError:

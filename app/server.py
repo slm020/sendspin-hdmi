@@ -87,10 +87,6 @@ async def mpris_poll() -> None:
                            updated=time.time())
                 await asyncio.sleep(2)
                 continue
-            if names[0] != now.get("_bus"):  # Sendspin client (re)started
-                if now.get("_bus"):
-                    ma_source.open_rejoin_window("player restarted")
-                now["_bus"] = names[0]
             r = await bus.call(Message(destination=names[0], path="/org/mpris/MediaPlayer2",
                                        interface="org.freedesktop.DBus.Properties", member="GetAll",
                                        signature="s", body=["org.mpris.MediaPlayer2.Player"]))
@@ -233,7 +229,6 @@ async def api_config_post(req):
     try:
         new["player"]["output_delay_ms"] = int(new["player"]["output_delay_ms"] or 0)
         new["screen"]["lyric_offset_ms"] = int(new["screen"]["lyric_offset_ms"] or 0)
-        new["groups"]["rejoin_window_s"] = max(10, int(new["groups"]["rejoin_window_s"] or 120))
         new["hooks"]["stop_delay_s"] = max(0, int(new["hooks"]["stop_delay_s"] or 0))
         new["web"]["port"] = int(new["web"]["port"] or 8080)
     except (TypeError, ValueError) as exc:
@@ -248,11 +243,11 @@ async def api_config_post(req):
     if (_changed(old, new, "player") or old["ma"]["sendspin_url"] != new["ma"]["sendspin_url"]
             or conf.sendspin_url(old) != conf.sendspin_url(new)):
         restart_later(UNITS["player"])
-        actions.append("player restarted (it rejoins its group by itself)")
+        actions.append("player restarted")
     if _changed(old, new, "screen", ["resolution", "enabled"]):
         restart_later(UNITS["kiosk"])
         actions.append("screen restarted")
-    if _changed(old, new, "ma", ["url", "token"]) or _changed(old, new, "player", ["name"]) or _changed(old, new, "groups"):
+    if _changed(old, new, "ma", ["url", "token"]) or _changed(old, new, "player", ["name"]):
         if ma_source._client:
             ma_source._client.restart(new)
         actions.append("reconnecting to Music Assistant")
