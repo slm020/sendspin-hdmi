@@ -29,8 +29,8 @@ Everything shown on the screen comes from Music Assistant, so it matches what Mu
 ## Requirements
 
 - Music Assistant with Sendspin support (tested with 2.11 beta) and its Sendspin player provider enabled.
-- A Music Assistant **long-lived token**: in Music Assistant open your profile (top right) → *Long-lived access tokens* → *Create*.
-- A machine with an HDMI output that Linux can drive: an Intel/AMD mini PC is ideal. Debian 12 or 13 (container, VM with GPU passthrough, or bare metal).
+- A Music Assistant **long-lived token**: in Music Assistant open your user profile and create one in its tokens section.
+- A machine with an HDMI output that Linux can drive: an Intel/AMD mini PC is ideal. Debian (tested on Debian 13 in a Proxmox LXC; Debian 12, VMs and bare metal should work but are untested).
 
 ## Install on Proxmox (recommended)
 
@@ -49,7 +49,7 @@ What the script changes on the host, and what that means:
 - The container drives the host's HDMI output directly, so the Proxmox text console on that screen is replaced by the now-playing screen while the container runs.
 - Only one container can use the HDMI output at a time.
 
-## Install on any Debian 12/13 machine
+## Install on any Debian machine
 
 Run as root on the machine (or inside a container or VM that already has `/dev/snd` and `/dev/dri`):
 

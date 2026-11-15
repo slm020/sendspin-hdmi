@@ -259,7 +259,8 @@ async def api_config_post(req):
     elif ma_source._client:
         ma_source._client.cfg = new
     if old["web"]["port"] != new["web"]["port"]:
-        restart_later(UNITS["web"], delay=1.5)
+        # the kiosk browser has the old port in its URL: restart it after the web service
+        restart_later(UNITS["web"], UNITS["kiosk"], delay=1.5)
         actions.append(f"settings page moving to port {new['web']['port']}")
     return web.json_response({"ok": True, "actions": actions})
 

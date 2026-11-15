@@ -26,8 +26,18 @@ RUN_DIR = "/run/sendspin-hdmi"
 TOKEN_FILE = os.path.join(RUN_DIR, "stop-token")
 
 
+LOG_FILE = os.path.join(conf.STATE_DIR, "hooks.log")
+
+
 def log(msg):
+    line = f"{time.strftime('%Y-%m-%d %H:%M:%S')} {msg}"
     print(f"[hook] {msg}", flush=True)
+    try:  # Sendspin only shows hook output when a hook fails, so keep our own short log
+        lines = open(LOG_FILE).read().splitlines()[-199:] if os.path.exists(LOG_FILE) else []
+        with open(LOG_FILE, "w") as f:
+            f.write("\n".join(lines + [line]) + "\n")
+    except OSError:
+        pass
 
 
 def denon(action, which):
@@ -85,6 +95,7 @@ def main():
     which = sys.argv[1] if len(sys.argv) > 1 else ""
     os.makedirs(RUN_DIR, exist_ok=True)
     if which == "start":
+        log("start: playback started")
         with open(TOKEN_FILE, "w") as f:
             f.write("started")
         run_action("start")
@@ -95,8 +106,12 @@ def main():
         with open(TOKEN_FILE, "w") as f:
             f.write(token)
         # detach so the player is not blocked while we wait
+        # Detach completely (no shared stdout/stderr): Sendspin waits for the hook's
+        # output pipes to close, so an inherited pipe would block it for the whole delay.
         subprocess.Popen([sys.executable, os.path.abspath(__file__), "_stop_later", token],
-                         start_new_session=True, stdout=sys.stdout, stderr=sys.stderr)
+                         start_new_session=True, stdin=subprocess.DEVNULL,
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        log(f"stop: action in {conf.load()['hooks']['stop_delay_s']}s unless playback resumes")
     elif which == "_stop_later":
         token = sys.argv[2]
         time.sleep(conf.load()["hooks"]["stop_delay_s"])
