@@ -149,7 +149,19 @@ class MAClient:
         pid = state["player_id"]
         if not pid:
             return
-        q = await self.call("player_queues/get_active_queue", player_id=pid) or {}
+        # get_active_queue can return a stale idle group queue (e.g. the last group that
+        # played) while the player is really playing in another group, so ask the player
+        # which queue its current media comes from first.
+        q = None
+        try:
+            p = await self.call("players/get", player_id=pid) or {}
+            qid = (p.get("current_media") or {}).get("source_id") or p.get("active_group")
+            if qid:
+                q = await self.call("player_queues/get", queue_id=qid)
+        except MAError:
+            q = None
+        if not q:
+            q = await self.call("player_queues/get_active_queue", player_id=pid) or {}
         ci = q.get("current_item") or {}
         mi = ci.get("media_item") or {}
         st = {"playing": "Playing", "paused": "Paused"}.get(q.get("state"), "Stopped")
