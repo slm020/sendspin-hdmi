@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Now Playing</title>
+<style>
+  :root {
+    --bg: #0b0d12;
+    --fg: #f4f5f8;
+    --dim: rgba(244, 245, 248, .42);
+    --mid: rgba(244, 245, 248, .7);
+    --accent: #5ac8fa;
+    --card: rgba(255, 255, 255, .06);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg); color: var(--fg);
+    font-family: "Noto Sans", system-ui, sans-serif; cursor: none; }
+  /* everything is laid out for 1920x1080 and scaled to the real screen */
+  #stage { position: fixed; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0; }
+
+  #bg { position: fixed; inset: -80px; background-size: cover; background-position: center;
+    filter: blur(70px) saturate(1.4) brightness(.45); transform: scale(1.1); transition: opacity 1s; }
+  #shade { position: fixed; inset: 0; background: linear-gradient(90deg, rgba(0,0,0,.35), rgba(0,0,0,.1) 60%, rgba(0,0,0,.35)); }
+
+  .brand { position: absolute; top: 44px; left: 64px; display: flex; align-items: center; gap: 16px; z-index: 5; }
+  .brand svg { width: 52px; height: 52px; }
+  .brand span { font-size: 34px; font-weight: 600; letter-spacing: .5px; }
+  #clock { position: absolute; top: 48px; right: 64px; font-size: 34px; color: var(--mid); z-index: 5; font-variant-numeric: tabular-nums; }
+  body.noclock #clock, body.noclock #idleclock { display: none; }
+
+  /* Now playing */
+  #player { position: absolute; inset: 0; display: grid; grid-template-columns: 760px 1fr; gap: 80px;
+    padding: 130px 64px 60px 64px; opacity: 0; transition: opacity .8s; pointer-events: none; }
+  body.nolyricspanel #player { grid-template-columns: 1fr; justify-items: center; }
+  body.nolyricspanel .right { display: none; }
+  body.playing #player { opacity: 1; }
+  .left { display: flex; flex-direction: column; justify-content: center; gap: 36px; width: 760px; }
+  #cover { width: 580px; height: 580px; border-radius: 28px; background: var(--card) center/cover no-repeat;
+    box-shadow: 0 30px 90px rgba(0,0,0,.55); align-self: center; transition: transform .6s; }
+  body.paused #cover { transform: scale(.94); }
+  .meta { padding: 0 60px; }
+  #title { font-size: 46px; font-weight: 700; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #artist { font-size: 32px; color: var(--mid); margin-top: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #album { font-size: 24px; color: var(--dim); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #wave { display: block; margin: 22px 60px 0; width: 640px; height: 64px; }
+  .times { margin: 10px 60px 0; display: flex; justify-content: space-between; font-size: 22px; color: var(--dim); font-variant-numeric: tabular-nums; }
+
+  .right { position: relative; overflow: hidden;
+    -webkit-mask-image: linear-gradient(transparent 0, #000 18%, #000 78%, transparent 100%);
+            mask-image: linear-gradient(transparent 0, #000 18%, #000 78%, transparent 100%); }
+  #lyrics { position: absolute; left: 0; right: 0; top: 0; transition: transform .7s cubic-bezier(.2,.7,.2,1); }
+  .ln { font-size: 52px; font-weight: 700; line-height: 1.25; padding: 14px 0; color: var(--dim);
+    transition: color .5s, transform .5s, opacity .5s; transform-origin: left center; transform: scale(.82); opacity: .75; }
+  .ln.near { opacity: .9; }
+  .ln.cur { color: var(--fg); transform: scale(1); opacity: 1; }
+  .ln.empty { height: 40px; padding: 0; }
+  .plain { font-size: 38px; font-weight: 600; line-height: 1.4; color: var(--mid); white-space: pre-wrap; }
+  #nolyrics { position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
+    font-size: 36px; color: var(--dim); text-align: center; }
+  body.nolyrics #nolyrics { display: flex; }
+
+  /* Idle */
+  #idle { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 28px; opacity: 1; transition: opacity .8s; }
+  body.playing #idle { opacity: 0; pointer-events: none; visibility: hidden; transition: opacity .8s, visibility 0s .8s; }
+  body.idle-black:not(.playing) #stage > :not(#idle), body.idle-black #idle { visibility: hidden; }
+  body.idle-black:not(.playing) #bg, body.idle-black:not(.playing) #shade { display: none; }
+  body.idle-logo #idleclock { display: none; }
+  #idle svg { width: 220px; height: 220px; }
+  #idle h1 { font-size: 84px; font-weight: 700; letter-spacing: 1px; }
+  #idle p { font-size: 34px; color: var(--dim); }
+  #idleclock { font-size: 120px; font-weight: 300; color: var(--mid); font-variant-numeric: tabular-nums; margin-top: 30px; }
+  .bars rect { fill: var(--accent); }
+  @keyframes eq { 0%,100% { transform: scaleY(.35);} 50% { transform: scaleY(1);} }
+  .bars rect { transform-box: fill-box; transform-origin: center; animation: eq 1.4s ease-in-out infinite; }
+  .bars rect:nth-child(2) { animation-delay: -.3s; } .bars rect:nth-child(3) { animation-delay: -.6s; }
+  .bars rect:nth-child(4) { animation-delay: -.9s; } .bars rect:nth-child(5) { animation-delay: -1.2s; }
+  .brand .bars rect { animation: none; }
+  body.playing:not(.paused) .brand .bars rect { animation: eq .9s ease-in-out infinite; }
+  body.playing:not(.paused) .brand .bars rect:nth-child(2) { animation-delay: -.2s; }
+  body.playing:not(.paused) .brand .bars rect:nth-child(3) { animation-delay: -.4s; }
+  body.playing:not(.paused) .brand .bars rect:nth-child(4) { animation-delay: -.6s; }
+  body.playing:not(.paused) .brand .bars rect:nth-child(5) { animation-delay: -.8s; }
+</style>
+</head>
+<body>
+<div id="bg"></div><div id="shade"></div>
+<div id="stage">
+<div class="brand">
+  <svg class="bars" viewBox="0 0 64 64" aria-hidden="true">
+    <rect x="4" y="22" width="8" height="20" rx="4"/><rect x="16" y="10" width="8" height="44" rx="4"/>
+    <rect x="28" y="2" width="8" height="60" rx="4"/><rect x="40" y="14" width="8" height="36" rx="4"/>
+    <rect x="52" y="24" width="8" height="16" rx="4"/>
+  </svg>
+  <span id="brand"></span>
+</div>
+<div id="clock"></div>
+
+<div id="player">
+  <div class="left">
+    <div id="cover"></div>
+    <div>
+      <div class="meta"><div id="title"></div><div id="artist"></div><div id="album"></div></div>
+      <canvas id="wave"></canvas>
+      <div class="times"><span id="tcur">0:00</span><span id="tlen">0:00</span></div>
+    </div>
+  </div>
+  <div class="right">
+    <div id="lyrics"></div>
+    <div id="nolyrics">No lyrics for this track</div>
+  </div>
+</div>
+
+<div id="idle">
+  <svg class="bars" viewBox="0 0 64 64" aria-hidden="true">
+    <rect x="4" y="22" width="8" height="20" rx="4"/><rect x="16" y="10" width="8" height="44" rx="4"/>
+    <rect x="28" y="2" width="8" height="60" rx="4"/><rect x="40" y="14" width="8" height="36" rx="4"/>
+    <rect x="52" y="24" width="8" height="16" rx="4"/>
+  </svg>
+  <h1 id="idlebrand"></h1>
+  <p>Waiting for music</p>
+  <div id="idleclock"></div>
+</div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+let S = { show_lyrics: true, show_waveform: true, show_clock: true, clock_24h: true, idle: "clock", lyric_offset_ms: 0, accent: "#5ac8fa", brand: "" };
+let sJson = "";
+let cur = { key: "", lines: [], plain: "", dur: 0, bins: null };
+let st = { status: "Stopped", position: 0, fetched: 0 };
+let lastIdx = -2, wavePeaks = [];
+
+const fmt = ms => { ms = Math.max(0, ms|0); const s = Math.floor(ms/1000); return Math.floor(s/60) + ":" + String(s%60).padStart(2,"0"); };
+
+function fit() {  // scale the 1920x1080 layout to the actual window
+  const k = Math.min(innerWidth / 1920, innerHeight / 1080);
+  const st = $("stage"); st.style.transform = `translate(${(innerWidth - 1920*k)/2}px, ${(innerHeight - 1080*k)/2}px) scale(${k})`;
+}
+addEventListener("resize", fit); fit();
+
+async function loadSettings() {
+  try {
+    const j = await (await fetch("/api/screen")).text();
+    if (j === sJson) return;
+    const first = !sJson; sJson = j; S = JSON.parse(j);
+    document.documentElement.style.setProperty("--accent", S.accent || "#5ac8fa");
+    $("brand").textContent = S.brand; $("idlebrand").textContent = S.brand;
+    document.title = S.brand + " - Now Playing";
+    document.body.classList.toggle("noclock", !S.show_clock);
+    document.body.classList.toggle("nolyricspanel", !S.show_lyrics);
+    $("wave").style.display = S.show_waveform ? "" : "none";
+    ["idle-clock", "idle-logo", "idle-black"].forEach(c => document.body.classList.remove(c));
+    document.body.classList.add("idle-" + (S.idle || "clock"));
+    tickClock();
+    if (!first) { cur.key = ""; lastIdx = -2; }
+  } catch (e) {}
+}
+setInterval(loadSettings, 10000);
+
+function tickClock() {
+  const t = new Date().toLocaleTimeString(S.clock_24h ? "en-GB" : "en-US", { hour: "2-digit", minute: "2-digit", hour12: !S.clock_24h });
+  $("clock").textContent = t; $("idleclock").textContent = t;
+}
+setInterval(tickClock, 1000);
+
+const key = n => n.key || (n.artist + "|" + n.title + "|" + n.album);
+
+async function loadLyrics(n) {
+  if (!S.show_lyrics) return;
+  try {
+    const d = await (await fetch("/api/lyrics?key=" + encodeURIComponent(n.key || ""))).json();
+    if (cur.key !== key(n)) return;
+    if (d.pending) { setTimeout(() => { if (cur.key === key(n)) loadLyrics(n); }, 3000); return; }
+    renderLyrics(d);
+  } catch (e) { renderLyrics({ synced: [], plain: "" }); }
+}
+
+function renderLyrics(d) {
+  const box = $("lyrics"); box.innerHTML = ""; lastIdx = -2;
+  cur.lines = d.synced || []; cur.plain = d.plain || "";
+  document.body.classList.toggle("nolyrics", !cur.lines.length && !cur.plain);
+  if (cur.lines.length) {
+    cur.lines.forEach(l => {
+      const el = document.createElement("div"); el.className = "ln" + (l.text ? "" : " empty");
+      el.textContent = l.text; box.appendChild(el);
+    });
+    box.style.transform = "translateY(300px)";
+  } else if (cur.plain) {
+    const el = document.createElement("div"); el.className = "plain"; el.textContent = cur.plain; box.appendChild(el);
+    box.style.transform = "translateY(0)";
+  }
+}
+
+// Real waveform from Music Assistant (audio_analysis/wave_form). No data = plain bar.
+async function loadWave(n) {
+  if (!n.key || !S.show_waveform) return;
+  try {
+    const d = await (await fetch("/api/wave?key=" + encodeURIComponent(n.key))).json();
+    if (cur.key !== key(n)) return;
+    if (d.wave && d.wave.length) { cur.bins = d.wave; wavePeaks = []; return; }
+  } catch (e) {}
+  setTimeout(() => { if (cur.key === key(n)) loadWave(n); }, 10000);
+}
+function binsToPeaks(bins, n) {
+  const out = [], per = bins.length / n;
+  for (let i = 0; i < n; i++) {
+    let m = 0; for (let j = Math.floor(i * per); j < Math.floor((i + 1) * per); j++) m = Math.max(m, bins[j] || 0);
+    out.push(m);
+  }
+  const mx = Math.max(...out) || 1;
+  return out.map(v => Math.max(0.06, v / mx));
+}
+function drawWave(frac) {
+  const c = $("wave"), w = 640, h = 64, dpr = 2;
+  if (c.width !== w * dpr) { c.width = w * dpr; c.height = h * dpr; }
+  const g = c.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
+  const on = "rgba(255,255,255,.95)", off = "rgba(255,255,255,.22)";
+  if (cur.bins && !wavePeaks.length) wavePeaks = binsToPeaks(cur.bins, Math.floor(w / 6));
+  const n = wavePeaks.length;
+  if (!n) {
+    g.fillStyle = off; g.beginPath(); g.roundRect(0, h/2 - 4, w, 8, 4); g.fill();
+    g.fillStyle = on; g.beginPath(); g.roundRect(0, h/2 - 4, Math.max(8, frac * w), 8, 4); g.fill();
+    return;
+  }
+  const step = w / n, bw = Math.max(2, step * 0.58), cut = frac * w;
+  for (let i = 0; i < n; i++) {
+    const x = i * step + (step - bw) / 2, bh = Math.max(3, wavePeaks[i] * h), y = (h - bh) / 2;
+    const played = x + bw <= cut, partial = !played && x < cut;
+    g.fillStyle = played ? on : off; g.beginPath(); g.roundRect(x, y, bw, bh, bw / 2); g.fill();
+    if (partial) {
+      g.save(); g.beginPath(); g.rect(x, 0, cut - x, h); g.clip();
+      g.fillStyle = on; g.beginPath(); g.roundRect(x, y, bw, bh, bw / 2); g.fill(); g.restore();
+    }
+  }
+}
+
+async function poll() {
+  try {
+    const n = await (await fetch("/api/now")).json();
+    const active = (n.status === "Playing" || n.status === "Paused") && n.title;
+    document.body.classList.toggle("playing", !!active);
+    document.body.classList.toggle("paused", n.status === "Paused");
+    if (active) {
+      if (cur.key !== key(n)) {
+        cur.key = key(n); cur.dur = n.length; cur.bins = null; wavePeaks = [];
+        $("title").textContent = n.title; $("artist").textContent = n.artist; $("album").textContent = n.album;
+        const art = n.art ? "/art?u=" + encodeURIComponent(n.art) : "";
+        $("cover").style.backgroundImage = art ? `url("${art}")` : "none";
+        $("bg").style.backgroundImage = art ? `url("${art}")` : "none";
+        $("tlen").textContent = fmt(n.length / 1000);
+        renderLyrics({ synced: [], plain: "" }); document.body.classList.remove("nolyrics");
+        loadLyrics(n); loadWave(n);
+      }
+      st = { status: n.status, position: n.position / 1000 + (n.age || 0) * 1000, fetched: performance.now() };
+      if (n.status === "Paused") st.position = n.position / 1000;
+    } else { cur.key = ""; }
+  } catch (e) {}
+}
+
+function frame() {
+  const pos = st.position + (st.status === "Playing" ? performance.now() - st.fetched : 0);
+  if (cur.dur) {
+    if (S.show_waveform) drawWave(Math.max(0, Math.min(1, pos / (cur.dur / 1000))));
+    $("tcur").textContent = fmt(pos);
+  }
+  if (cur.lines.length) {
+    const p = pos - (S.lyric_offset_ms || 0);
+    let idx = -1;
+    for (let i = 0; i < cur.lines.length; i++) { if (cur.lines[i].t <= p) idx = i; else break; }
+    if (idx !== lastIdx) {
+      lastIdx = idx;
+      const els = $("lyrics").children;
+      for (let i = 0; i < els.length; i++) {
+        els[i].classList.toggle("cur", i === idx);
+        els[i].classList.toggle("near", Math.abs(i - idx) === 1);
+      }
+      const target = els[Math.max(0, idx)];
+      if (target) {
+        const h = $("lyrics").parentElement.clientHeight;
+        $("lyrics").style.transform = `translateY(${h * 0.38 - target.offsetTop - target.offsetHeight / 2}px)`;
+      }
+    }
+  }
+  requestAnimationFrame(frame);
+}
+
+loadSettings().then(() => { poll(); setInterval(poll, 1000); requestAnimationFrame(frame); });
+</script>
+</body>
+</html>

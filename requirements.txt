@@ -1,0 +1,8 @@
+# Versions known to work together (tested with Music Assistant 2.11 beta)
+sendspin==9.1.0
+aiosendspin==10.2.2
+aiosendspin-mpris==2.1.1
+aiohttp>=3.9
+dbus-next>=0.2.3
+numpy
+sounddevice

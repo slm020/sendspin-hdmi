@@ -1,0 +1,14 @@
+[Unit]
+Description=sendspin-hdmi: Sendspin player (audio over HDMI)
+After=network-online.target sendspin-hdmi-bus.service
+Wants=network-online.target sendspin-hdmi-bus.service
+
+[Service]
+Environment=DBUS_SESSION_BUS_ADDRESS=unix:path=/run/sendspin-hdmi/bus
+Environment=HOME=/root
+ExecStart=/opt/sendspin-hdmi/venv/bin/python /opt/sendspin-hdmi/app/player.py
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

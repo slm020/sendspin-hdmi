@@ -1,0 +1,12 @@
+[Unit]
+Description=sendspin-hdmi: private D-Bus session bus (player metadata)
+
+[Service]
+RuntimeDirectory=sendspin-hdmi
+RuntimeDirectoryPreserve=yes
+ExecStartPre=/bin/rm -f /run/sendspin-hdmi/bus
+ExecStart=/usr/bin/dbus-daemon --session --nofork --address=unix:path=/run/sendspin-hdmi/bus
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

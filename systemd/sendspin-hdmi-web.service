@@ -1,0 +1,14 @@
+[Unit]
+Description=sendspin-hdmi: now-playing screen and settings page
+After=network-online.target sendspin-hdmi-bus.service
+Wants=network-online.target
+
+[Service]
+Environment=DBUS_SESSION_BUS_ADDRESS=unix:path=/run/sendspin-hdmi/bus
+WorkingDirectory=/opt/sendspin-hdmi/app
+ExecStart=/opt/sendspin-hdmi/venv/bin/python /opt/sendspin-hdmi/app/server.py
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

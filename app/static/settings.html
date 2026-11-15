@@ -1,0 +1,369 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Player Settings</title>
+<style>
+  :root {
+    --bg: #f5f6f8; --card: #ffffff; --fg: #15171c; --dim: #5d6370; --line: #e2e5ea;
+    --accent: #2b7bd6; --ok: #1f8a4c; --bad: #c0392b; --warn: #b7791f; --input: #ffffff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0e1015; --card: #171a21; --fg: #eef0f4; --dim: #9aa1ad; --line: #2a2f3a;
+      --accent: #5ac8fa; --ok: #3ecf7a; --bad: #ff6b5b; --warn: #f0b24a; --input: #10131a; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 20px 16px 120px; }
+  h1 { font-size: 24px; margin: 8px 0 4px; }
+  .sub { color: var(--dim); margin-bottom: 18px; }
+  section { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin: 14px 0; }
+  h2 { font-size: 17px; margin: 0 0 4px; }
+  .hint { color: var(--dim); font-size: 13px; margin: 2px 0 10px; }
+  label { display: block; margin: 12px 0 4px; font-weight: 600; font-size: 14px; }
+  input[type=text], input[type=url], input[type=number], input[type=password], select, textarea {
+    width: 100%; padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--input);
+    color: var(--fg); font: inherit; }
+  textarea { min-height: 70px; font-family: ui-monospace, monospace; font-size: 13px; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; }
+  .row > * { flex: 1 1 200px; }
+  .check { display: flex; align-items: center; gap: 10px; margin: 10px 0; font-weight: 500; }
+  .check input { width: 18px; height: 18px; }
+  button { padding: 9px 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--fg);
+    font: inherit; cursor: pointer; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  button:disabled { opacity: .5; cursor: default; }
+  .msg { font-size: 13px; margin-top: 8px; min-height: 18px; }
+  .ok { color: var(--ok); } .bad { color: var(--bad); } .warn { color: var(--warn); }
+  .grid { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; font-size: 14px; }
+  .grid div:nth-child(odd) { color: var(--dim); }
+  .pill { display: inline-block; padding: 1px 8px; border-radius: 99px; font-size: 12px; font-weight: 600; border: 1px solid currentColor; }
+  .groups label { font-weight: 500; }
+  .hidden { display: none; }
+  .savebar { position: fixed; left: 0; right: 0; bottom: 0; background: var(--card); border-top: 1px solid var(--line);
+    padding: 12px 16px; display: flex; gap: 12px; align-items: center; justify-content: center; }
+  .savebar .msg { margin: 0; }
+  code { font-size: 12.5px; background: var(--bg); padding: 1px 5px; border-radius: 5px; overflow-wrap: anywhere; }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<main>
+  <h1 id="h1">Player settings</h1>
+  <div class="sub">Sendspin player with an HDMI now-playing screen for Music Assistant. <a href="/" target="_blank">Open the screen</a></div>
+
+  <section>
+    <h2>Status</h2>
+    <div class="grid" id="status"><div>Loading</div><div></div></div>
+    <div class="row" style="margin-top:12px">
+      <button onclick="restart('player')">Restart player</button>
+      <button onclick="restart('kiosk')">Restart screen</button>
+    </div>
+    <div class="msg" id="statusMsg"></div>
+  </section>
+
+  <section>
+    <h2>Music Assistant</h2>
+    <div class="hint">Make a long-lived token in Music Assistant: your profile (top right) &rarr; Long-lived access tokens &rarr; Create.</div>
+    <label for="ma_url">Music Assistant address</label>
+    <input type="url" id="ma_url" placeholder="http://192.168.1.10:8095">
+    <label for="ma_token">Token</label>
+    <input type="password" id="ma_token" placeholder="(unchanged)" autocomplete="off">
+    <div class="row" style="margin-top:10px"><button onclick="testMA()">Test connection</button></div>
+    <div class="msg" id="maMsg"></div>
+    <details style="margin-top:8px"><summary class="hint">Advanced</summary>
+      <label for="ma_sendspin_url">Sendspin server URL</label>
+      <input type="text" id="ma_sendspin_url" placeholder="blank = ws://&lt;MA host&gt;:8927/sendspin">
+      <div class="hint">Leave blank unless Music Assistant's Sendspin server is on another host or port.</div>
+    </details>
+  </section>
+
+  <section>
+    <h2>Player &amp; audio</h2>
+    <label for="player_name">Player name (shown in Music Assistant)</label>
+    <input type="text" id="player_name">
+    <label for="player_audio_device">HDMI audio output</label>
+    <div class="row">
+      <select id="player_audio_device"></select>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button onclick="loadDevices(true)">Rescan (stops audio for a moment)</button>
+      <button onclick="testTone()">Play test tone</button>
+    </div>
+    <div class="msg" id="audioMsg"></div>
+    <div class="hint">HDMI outputs are named after the connected TV or receiver once it's detected. The device the player is using can be missing from a normal scan. Rescan stops the player so every device shows.</div>
+    <div class="row">
+      <div><label for="player_output_delay_ms">Sync delay (ms)</label><input type="number" id="player_output_delay_ms" step="10"></div>
+      <div><label for="player_audio_format">Audio format</label><input type="text" id="player_audio_format" placeholder="automatic, e.g. flac:48000:24:2"></div>
+    </div>
+    <div class="hint">If this player is out of sync with your other speakers, adjust the delay. Music Assistant also has a per-player delay setting (Settings &rarr; Players &rarr; this player).</div>
+  </section>
+
+  <section>
+    <h2>Screen</h2>
+    <div class="check"><input type="checkbox" id="screen_enabled"><label for="screen_enabled" style="margin:0">Show the now-playing screen on HDMI</label></div>
+    <div class="row">
+      <div><label for="screen_resolution">Resolution</label>
+        <select id="screen_resolution">
+          <option>1920x1080@60Hz</option><option>1280x720@60Hz</option><option>2560x1440@60Hz</option><option>3840x2160@30Hz</option><option>3840x2160@60Hz</option>
+        </select></div>
+      <div><label for="screen_brand">Title (top left)</label><input type="text" id="screen_brand" placeholder="blank = player name"></div>
+    </div>
+    <div class="hint">1080p is safest. On some Intel mini PCs, 4K gave no picture and also cut HDMI audio.</div>
+    <div class="check"><input type="checkbox" id="screen_show_lyrics"><label for="screen_show_lyrics" style="margin:0">Lyrics (from Music Assistant)</label></div>
+    <div class="check"><input type="checkbox" id="screen_show_waveform"><label for="screen_show_waveform" style="margin:0">Waveform progress bar (Music Assistant's analysis)</label></div>
+    <div class="check"><input type="checkbox" id="screen_show_clock"><label for="screen_show_clock" style="margin:0">Clock</label></div>
+    <div class="check"><input type="checkbox" id="screen_clock_24h"><label for="screen_clock_24h" style="margin:0">24-hour clock</label></div>
+    <div class="row">
+      <div><label for="screen_idle">When nothing plays</label>
+        <select id="screen_idle"><option value="clock">Logo and clock</option><option value="logo">Logo only</option><option value="black">Black screen</option></select></div>
+      <div><label for="screen_lyric_offset_ms">Lyric timing (ms)</label><input type="number" id="screen_lyric_offset_ms" step="50"></div>
+      <div><label for="screen_accent">Accent colour</label><input type="text" id="screen_accent" placeholder="#5ac8fa"></div>
+    </div>
+    <div class="hint">Lyric timing: positive shows lines later, negative earlier.</div>
+  </section>
+
+  <section>
+    <h2>Groups</h2>
+    <div class="hint">Saved members of a Music Assistant sync group play whenever that group starts. If this player restarts partway through a song, Music Assistant leaves it out until the group starts again. Auto-rejoin puts it back.</div>
+    <div class="groups" id="groups"><div class="hint">Loading groups</div></div>
+    <div class="msg" id="groupMsg"></div>
+    <div class="check"><input type="checkbox" id="groups_auto_rejoin"><label for="groups_auto_rejoin" style="margin:0">Rejoin a playing group after this player restarts</label></div>
+    <label for="groups_rejoin_window_s">Only within this many seconds of reconnecting</label>
+    <input type="number" id="groups_rejoin_window_s" min="10" step="10">
+    <div class="hint">So that taking the player out of a group by hand later on is respected.</div>
+  </section>
+
+  <section>
+    <h2>Amp control</h2>
+    <div class="hint">Run something when playback starts and stops, e.g. switch your AV receiver on and to the right input. Announcements count as playback too.</div>
+    <div id="hook_start"></div>
+    <div id="hook_stop"></div>
+    <label for="hooks_stop_delay_s">Wait before the stop action (seconds)</label>
+    <input type="number" id="hooks_stop_delay_s" min="0" step="5">
+    <div class="hint">The stop action is cancelled if music starts again within this time, so pauses and track changes don't switch the amp off.</div>
+  </section>
+
+  <section>
+    <h2>Security</h2>
+    <label for="web_new_password">New settings password</label>
+    <input type="password" id="web_new_password" placeholder="(unchanged)" autocomplete="new-password">
+    <div class="hint" id="pwHint"></div>
+    <label for="web_port">Web port</label>
+    <input type="number" id="web_port" min="1" max="65535">
+  </section>
+</main>
+
+<div class="savebar"><button class="primary" id="saveBtn" onclick="save()">Save</button><div class="msg" id="saveMsg"></div></div>
+
+<template id="hookTpl">
+  <h2 style="margin-top:14px" class="hk-title"></h2>
+  <label>Action</label>
+  <select class="hk-type">
+    <option value="none">Nothing</option>
+    <option value="denon">Denon / Marantz receiver (network)</option>
+    <option value="webhook">Webhook (e.g. Home Assistant)</option>
+    <option value="command">Shell command</option>
+  </select>
+  <div class="hk-denon hidden">
+    <div class="row">
+      <div><label>Receiver IP address</label><input type="text" class="hk-denon_host" placeholder="192.168.1.50"></div>
+      <div class="hk-startonly"><label>Input</label><input type="text" class="hk-denon_input" placeholder="e.g. AUX2, BD, GAME"></div>
+      <div class="hk-startonly"><label>Sound mode</label><input type="text" class="hk-denon_mode" placeholder="e.g. MCH STEREO, STEREO"></div>
+    </div>
+    <div class="check"><input type="checkbox" class="hk-denon_power"><span class="hk-powerlabel"></span></div>
+    <div class="hint">Uses the receiver's telnet control (port 23). Input and sound-mode names are the ones Denon uses in its control protocol.</div>
+  </div>
+  <div class="hk-webhook hidden">
+    <div class="row">
+      <div style="flex:0 0 110px"><label>Method</label><select class="hk-method"><option>POST</option><option>GET</option><option>PUT</option></select></div>
+      <div><label>URL</label><input type="url" class="hk-url" placeholder="http://homeassistant.local:8123/api/webhook/your-id"></div>
+    </div>
+    <label>Body (optional)</label><textarea class="hk-body" placeholder='{"event": "start"}'></textarea>
+  </div>
+  <div class="hk-command hidden">
+    <label>Command</label><input type="text" class="hk-command_in" placeholder="/usr/local/bin/amp-on.sh">
+    <div class="hint">Runs as root on this player. Gets SENDSPIN_* environment variables from the player.</div>
+  </div>
+  <div class="row" style="margin-top:10px"><button class="hk-test">Save and test now</button></div>
+  <div class="msg hk-msg"></div>
+</template>
+
+<script>
+const $ = id => document.getElementById(id);
+let CFG = null;
+const FIELDS = [
+  ["ma", "url"], ["ma", "sendspin_url"],
+  ["player", "name"], ["player", "audio_device"], ["player", "output_delay_ms", "int"], ["player", "audio_format"],
+  ["screen", "enabled", "bool"], ["screen", "resolution"], ["screen", "brand"], ["screen", "show_lyrics", "bool"],
+  ["screen", "show_waveform", "bool"], ["screen", "show_clock", "bool"], ["screen", "clock_24h", "bool"],
+  ["screen", "idle"], ["screen", "lyric_offset_ms", "int"], ["screen", "accent"],
+  ["groups", "auto_rejoin", "bool"], ["groups", "rejoin_window_s", "int"],
+  ["hooks", "stop_delay_s", "int"], ["web", "port", "int"],
+];
+const HOOK_KEYS = ["type", "denon_host", "denon_input", "denon_mode", "denon_power", "method", "url", "body"];
+
+function setMsg(id, text, cls) { const e = $(id); e.textContent = text || ""; e.className = "msg " + (cls || ""); }
+async function api(path, body) {
+  const r = await fetch(location.origin + path, body === undefined ? {} : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  if (!r.ok && r.status !== 400) throw new Error("HTTP " + r.status);
+  return r.json();
+}
+
+function buildHook(which) {
+  const box = $("hook_" + which);
+  box.appendChild($("hookTpl").content.cloneNode(true));
+  const q = c => box.querySelector(".hk-" + c);
+  q("title").textContent = which === "start" ? "When playback starts" : "When playback stops";
+  q("powerlabel").textContent = which === "start" ? "Switch the receiver on" : "Put the receiver in standby";
+  if (which === "stop") box.querySelectorAll(".hk-startonly").forEach(e => e.classList.add("hidden"));
+  const show = () => ["denon", "webhook", "command"].forEach(k => q(k).classList.toggle("hidden", q("type").value !== k));
+  q("type").addEventListener("change", show);
+  box.querySelector(".hk-msg").id = "hkmsg_" + which;
+  q("test").addEventListener("click", async () => {
+    setMsg("hkmsg_" + which, "Saving and running", "");
+    if (!(await save())) return;
+    try { const r = await api("/api/hooks/test", { which }); setMsg("hkmsg_" + which, r.output || (r.ok ? "Done" : "Failed"), r.ok ? "ok" : "bad"); }
+    catch (e) { setMsg("hkmsg_" + which, String(e), "bad"); }
+  });
+  box._q = q; box._show = show;
+}
+function fillHook(which, h) {
+  const q = $("hook_" + which)._q;
+  q("type").value = h.type || "none"; q("denon_host").value = h.denon_host || ""; q("denon_input").value = h.denon_input || "";
+  q("denon_mode").value = h.denon_mode || ""; q("denon_power").checked = h.denon_power !== false;
+  q("method").value = h.method || "POST"; q("url").value = h.url || ""; q("body").value = h.body || "";
+  q("command_in").value = h.command || "";
+  $("hook_" + which)._show();
+}
+function readHook(which) {
+  const q = $("hook_" + which)._q;
+  return { type: q("type").value, denon_host: q("denon_host").value.trim(), denon_input: q("denon_input").value.trim(),
+    denon_mode: q("denon_mode").value.trim(), denon_power: q("denon_power").checked, method: q("method").value,
+    url: q("url").value.trim(), body: q("body").value, command: q("command_in").value };
+}
+
+function fill(c) {
+  CFG = c;
+  for (const [s, k, t] of FIELDS) {
+    const el = $(s + "_" + k); if (!el) continue;
+    if (t === "bool") el.checked = !!c[s][k];
+    else if (el.tagName === "SELECT" && ![...el.options].some(o => o.value === String(c[s][k]))) {
+      const o = document.createElement("option"); o.value = o.textContent = c[s][k]; el.appendChild(o); el.value = c[s][k];
+    } else el.value = c[s][k] ?? "";
+  }
+  $("ma_token").placeholder = c.ma.token_set ? "(saved, leave blank to keep)" : "paste token here";
+  $("pwHint").textContent = c.web.password_set ? "A password is set. Leave blank to keep it." : "No password set: anyone on your network can change these settings.";
+  $("pwHint").className = "hint " + (c.web.password_set ? "" : "warn");
+  fillHook("start", c.hooks.start); fillHook("stop", c.hooks.stop);
+  $("h1").textContent = (c.player.name || "Player") + " settings";
+}
+
+function collect() {
+  const out = {};
+  for (const [s, k, t] of FIELDS) {
+    const el = $(s + "_" + k); if (!el) continue;
+    out[s] = out[s] || {};
+    out[s][k] = t === "bool" ? el.checked : t === "int" ? (el.value === "" ? 0 : parseInt(el.value, 10)) : el.value.trim();
+  }
+  if ($("ma_token").value.trim()) out.ma.token = $("ma_token").value.trim();
+  if ($("web_new_password").value) out.web.new_password = $("web_new_password").value;
+  out.hooks.start = readHook("start"); out.hooks.stop = readHook("stop");
+  return out;
+}
+
+async function save() {
+  $("saveBtn").disabled = true; setMsg("saveMsg", "Saving", "");
+  try {
+    const r = await api("/api/config", collect());
+    if (!r.ok) { setMsg("saveMsg", r.error || "Save failed", "bad"); return false; }
+    $("ma_token").value = ""; $("web_new_password").value = "";
+    setMsg("saveMsg", "Saved" + (r.actions.length ? ": " + r.actions.join(", ") : ""), "ok");
+    fill(await api("/api/config"));
+    setTimeout(status, 2500); setTimeout(loadGroups, 3500);
+    return true;
+  } catch (e) { setMsg("saveMsg", String(e), "bad"); return false; }
+  finally { $("saveBtn").disabled = false; }
+}
+
+async function status() {
+  try {
+    const s = await api("/api/status");
+    const u = s.units, pill = v => `<span class="pill ${v === "active" ? "ok" : "bad"}">${v}</span>`;
+    const ma = s.ma.connected ? `<span class="ok">connected</span> (MA ${s.ma.version || "?"})` : `<span class="bad">not connected</span>`;
+    const esc = t => String(t ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+    $("status").innerHTML = `
+      <div>Address</div><div>${esc(s.ips.join(", ") || s.hostname)}</div>
+      <div>Music Assistant</div><div>${ma}${s.ma.error ? ` <span class="warn">${esc(s.ma.error)}</span>` : ""}</div>
+      <div>Player in MA</div><div>${s.ma.player_id ? esc(s.ma.player_name) + ` <code>${esc(s.ma.player_id)}</code>` : '<span class="warn">not found yet</span>'}</div>
+      <div>Now</div><div>${esc(s.now.status)}${s.now.title ? " &middot; " + esc(s.now.title) : ""} <span class="hint">(${s.now.source === "ma" ? "from Music Assistant" : "from the player"})</span></div>
+      <div>Services</div><div>player ${pill(u.player)} screen ${pill(u.kiosk)} web ${pill(u.web)}</div>
+      <div>Sendspin server</div><div><code>${esc(s.sendspin_url || "auto-discover (mDNS)")}</code></div>`;
+  } catch (e) { setMsg("statusMsg", String(e), "bad"); }
+}
+
+async function restart(which) {
+  setMsg("statusMsg", "Restarting " + which, "");
+  await api("/api/restart", { which });
+  setTimeout(() => { status(); setMsg("statusMsg", "Restarted " + which, "ok"); }, 4000);
+}
+
+async function testMA() {
+  setMsg("maMsg", "Testing", "");
+  const r = await api("/api/ma/test", { url: $("ma_url").value.trim(), token: $("ma_token").value.trim() });
+  setMsg("maMsg", r.ok ? `Connected to ${r.name || "Music Assistant"} ${r.version}` : r.error, r.ok ? "ok" : "bad");
+}
+
+async function loadDevices(rescan) {
+  setMsg("audioMsg", rescan ? "Rescanning (audio stops briefly)" : "", "");
+  try {
+    const r = await api("/api/audio/devices" + (rescan ? "?rescan=1" : ""));
+    const sel = $("player_audio_device"), cur = sel.value || r.current;
+    sel.innerHTML = "";
+    const auto = document.createElement("option"); auto.value = "";
+    auto.textContent = r.auto ? `Automatic (connected HDMI: ${r.auto})` : "Automatic (no HDMI sink detected: system default)";
+    sel.appendChild(auto);
+    for (const d of r.devices) { const o = document.createElement("option"); o.value = d.name; o.textContent = `${d.label}`; sel.appendChild(o); }
+    if (cur && ![...sel.options].some(o => o.value === cur)) {
+      const o = document.createElement("option"); o.value = cur; o.textContent = cur + " (in use)"; sel.appendChild(o);
+    }
+    sel.value = cur || "";
+    if (rescan) setMsg("audioMsg", `Found ${r.devices.length} devices`, "ok");
+  } catch (e) { setMsg("audioMsg", String(e), "bad"); }
+}
+
+async function testTone() {
+  setMsg("audioMsg", "Playing a 2 second tone (the player pauses meanwhile)", "");
+  const r = await api("/api/audio/test", { device: $("player_audio_device").value });
+  setMsg("audioMsg", r.ok ? "Tone " + r.message : "Failed: " + r.message, r.ok ? "ok" : "bad");
+}
+
+async function loadGroups() {
+  try {
+    const r = await api("/api/ma/groups");
+    const box = $("groups");
+    if (!r.ok) { box.innerHTML = `<div class="hint warn"></div>`; box.firstChild.textContent = "Groups unavailable: " + r.error; return; }
+    if (!r.groups.length) { box.innerHTML = '<div class="hint">No sync groups in Music Assistant yet.</div>'; return; }
+    box.innerHTML = '<div class="hint">Saved member of:</div>';
+    for (const g of r.groups) {
+      const row = document.createElement("div"); row.className = "check";
+      const cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = g.member; cb.id = "g_" + g.id;
+      const lb = document.createElement("label"); lb.htmlFor = cb.id; lb.style.margin = "0"; lb.textContent = g.name;
+      cb.addEventListener("change", async () => {
+        setMsg("groupMsg", "Updating " + g.name, "");
+        const res = await api("/api/ma/groups", { id: g.id, member: cb.checked });
+        setMsg("groupMsg", res.ok ? `${cb.checked ? "Added to" : "Removed from"} ${g.name}` : res.error, res.ok ? "ok" : "bad");
+        if (!res.ok) cb.checked = !cb.checked;
+      });
+      row.append(cb, lb); box.appendChild(row);
+    }
+  } catch (e) { setMsg("groupMsg", String(e), "bad"); }
+}
+
+buildHook("start"); buildHook("stop");
+api("/api/config").then(c => { fill(c); loadDevices(false); });
+status(); loadGroups(); setInterval(status, 15000);
+</script>
+</body>
+</html>
